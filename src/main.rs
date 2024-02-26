@@ -7,17 +7,15 @@ use std::{
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
 
-    loop {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    handle_connection(stream);
-                    println!("accepted new connection");
-                }
-                Err(e) => {
-                    println!("error: {}", e);
-                    break;
-                }
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                handle_connection(stream);
+                println!("accepted new connection");
+            }
+            Err(e) => {
+                println!("error: {}", e);
+                break;
             }
         }
     }
@@ -29,6 +27,7 @@ fn handle_connection(mut stream: TcpStream) {
     let mut read_buf = Vec::with_capacity(512);
 
     loop {
+        thread::sleep(std::time::Duration::from_millis(500));
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
