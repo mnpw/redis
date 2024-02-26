@@ -38,7 +38,7 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
-                handle_data(&mut stream, &read_buf);
+                // handle_data(&mut stream, &read_buf);
                 break;
             }
             Err(_) => todo!(),
@@ -50,7 +50,7 @@ fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
     let res = String::from_utf8(read_buf.to_owned()).unwrap();
     println!("{res:?}");
 
-    let ping_response = "+PONG\r\n";
+    let ping_response = "+PONG\r\nPONG\r\n";
     let ping_response_size = ping_response.len();
 
     // if res.contains("PING") {
