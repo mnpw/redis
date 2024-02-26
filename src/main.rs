@@ -31,18 +31,21 @@ fn handle_connection(mut stream: TcpStream) {
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut read_buf) {
             Ok(n) => {
-                println!("Size read: {n}");
-                if n != 0 {
+                // Check if no bytes were read from the stream
+                if n == 0 {
+                    println!("Sleeping to read more data");
                     thread::sleep(std::time::Duration::from_millis(500));
                     continue;
                 }
-                break;
+                handle_data(&mut stream, &read_buf);
             }
             Err(_) => todo!(),
         }
     }
+}
 
-    let res = String::from_utf8(read_buf).unwrap();
+fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
+    let res = String::from_utf8(read_buf.to_owned()).unwrap();
     println!("{res:?}");
 
     let ping_response = "+PONG\r\n";
