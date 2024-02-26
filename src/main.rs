@@ -7,14 +7,17 @@ use std::{
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                handle_connection(stream);
-                println!("accepted new connection");
-            }
-            Err(e) => {
-                println!("error: {}", e);
+    loop {
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    handle_connection(stream);
+                    println!("accepted new connection");
+                }
+                Err(e) => {
+                    println!("error: {}", e);
+                    break;
+                }
             }
         }
     }
@@ -24,7 +27,6 @@ fn main() {
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
     let mut read_buf = Vec::with_capacity(512);
-    let mut write_count = 0;
 
     loop {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
@@ -39,10 +41,7 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
-                write_count += 1;
-                if write_count == 2 {
-                    break;
-                }
+                break;
             }
             Err(_) => todo!(),
         }
