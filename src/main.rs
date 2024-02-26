@@ -65,5 +65,5 @@ fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
         }
     }
 
-    // }
+    stream.flush().unwrap();
 }
