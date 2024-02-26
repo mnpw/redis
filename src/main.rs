@@ -25,9 +25,10 @@ fn main() {
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
     let mut read_buf = Vec::with_capacity(512);
+    stream.set_nodelay(true).unwrap();
 
     loop {
-        thread::sleep(std::time::Duration::from_millis(500));
+        // thread::sleep(std::time::Duration::from_millis(500));
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
@@ -40,6 +41,8 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
+                handle_data(&mut stream, &read_buf);
+                break;
             }
             Err(_) => todo!(),
         }
