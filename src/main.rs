@@ -30,8 +30,9 @@ fn handle_connection(mut stream: TcpStream) {
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut read_buf) {
-            Ok(usize) => {
-                if usize != 0 {
+            Ok(n) => {
+                println!("Size read: {n}");
+                if n != 0 {
                     thread::sleep(std::time::Duration::from_millis(500));
                     continue;
                 }
