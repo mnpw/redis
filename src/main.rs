@@ -51,11 +51,10 @@ fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
     println!("{res:?}");
 
     let ping_response = "+PONG\r\n";
-    let ping_response_size = ping_response.len();
 
     // if res.contains("PING") {
-    match stream.write(ping_response.as_bytes()) {
-        Ok(n) if n == ping_response_size => {
+    match stream.write_all(ping_response.as_bytes()) {
+        Ok(()) => {
             println!("Successfully ponged!");
         }
         _ => {
@@ -63,6 +62,5 @@ fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
         }
     }
 
-    stream.flush().unwrap()
     // }
 }
