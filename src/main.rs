@@ -32,11 +32,11 @@ fn handle_connection(mut stream: TcpStream) {
         match stream.read(&mut read_buf) {
             Ok(n) => {
                 // Check if no bytes were read from the stream
-                // if n == 0 {
-                //     println!("Sleeping to read more data");
-                //     thread::sleep(std::time::Duration::from_millis(500));
-                //     continue;
-                // }
+                if n == 0 {
+                    println!("Sleeping to read more data");
+                    thread::sleep(std::time::Duration::from_millis(500));
+                    continue;
+                }
                 handle_data(&mut stream, &read_buf);
                 break;
             }
@@ -46,31 +46,20 @@ fn handle_connection(mut stream: TcpStream) {
 }
 
 fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
-    // let res = String::from_utf8(read_buf.to_owned()).unwrap();
-    // println!("{res:?}");
-
-    // let ping_response = "+PONG\r\n";
-    // let ping_response_size = ping_response.len();
-
-    // if res.contains("PING") {
-    //     match stream.write(ping_response.as_bytes()) {
-    //         Ok(n) if n == ping_response_size => {
-    //             println!("Successfully ponged!");
-    //         }
-    //         _ => {
-    //             println!("Failed to pong :(")
-    //         }
-    //     }
-    // }
+    let res = String::from_utf8(read_buf.to_owned()).unwrap();
+    println!("{res:?}");
 
     let ping_response = "+PONG\r\n";
     let ping_response_size = ping_response.len();
-    match stream.write(ping_response.as_bytes()) {
-        Ok(n) if n == ping_response_size => {
-            println!("Successfully ponged!");
-        }
-        _ => {
-            println!("Failed to pong :(")
+
+    if res.contains("PING") {
+        match stream.write(ping_response.as_bytes()) {
+            Ok(n) if n == ping_response_size => {
+                println!("Successfully ponged!");
+            }
+            _ => {
+                println!("Failed to pong :(")
+            }
         }
     }
 }
