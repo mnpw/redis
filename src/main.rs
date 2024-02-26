@@ -39,8 +39,8 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
-                count += 1;
-                if count == 2 {
+                write_count += 1;
+                if write_count == 2 {
                     break;
                 }
             }
