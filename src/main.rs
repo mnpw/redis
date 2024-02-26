@@ -38,8 +38,6 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
-                handle_data(&mut stream, &read_buf);
-                break;
             }
             Err(_) => todo!(),
         }
