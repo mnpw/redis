@@ -24,6 +24,7 @@ fn main() {
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
     let mut read_buf = Vec::with_capacity(512);
+    let mut write_count = 0;
 
     loop {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
@@ -38,6 +39,10 @@ fn handle_connection(mut stream: TcpStream) {
                 //     continue;
                 // }
                 handle_data(&mut stream, &read_buf);
+                count += 1;
+                if count == 2 {
+                    break;
+                }
             }
             Err(_) => todo!(),
         }
