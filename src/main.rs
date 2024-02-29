@@ -27,7 +27,8 @@ fn main() {
 // Note: `fn fn_name(var: mut Type)` is invalid. mut is used to denote mutability
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
-    let mut buf = Vec::with_capacity(1024);
+    // let mut buf = Vec::with_capacity(1024);
+    let mut buf = [0; 1024];
     // // Sets TCP_NODELAY at kernel level. TCP_NODELAY basically disables Nagle's
     // // algorithm.
     // //
