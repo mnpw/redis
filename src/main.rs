@@ -102,6 +102,10 @@ fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
                         let _ = stream.write_all(op.as_bytes());
                     }
                 }
+
+                if message.contains("ping") {
+                    let _ = stream.write_all("+PONG\r\n".as_bytes());
+                }
             }
         }
     };
