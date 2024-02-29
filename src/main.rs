@@ -11,7 +11,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                println!("New connection: {:?}", stream.peer_addr());
+                println!("new connection: {:?}", stream.peer_addr());
                 thread::spawn(move || {
                     handle_connection(stream);
                 });
@@ -44,22 +44,22 @@ fn handle_connection(mut stream: TcpStream) {
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut read_buf) {
-            Ok(_n) => {
-                handle_data(&mut stream, &read_buf);
-                thread::sleep(Duration::from_secs_f64(0.5));
-                handle_data(&mut stream, &read_buf);
-                thread::sleep(Duration::from_secs_f64(0.5));
-                break;
+            Ok(n) => {
+                println!("buffer: {read_buf:?}");
+                if n == 0 {
+                    println!("waiting for more data...");
+                    thread::sleep(Duration::from_secs_f64(0.5));
+                    continue;
+                }
+                println!("sending pong...");
+                handle_data(&mut stream);
             }
             Err(_) => todo!(),
         }
     }
 }
 
-fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
-    let res = String::from_utf8(read_buf.to_owned()).unwrap();
-    println!("Client says: {res:?}");
-
+fn handle_data(stream: &mut TcpStream) {
     let ping_response = "+PONG\r\n";
 
     match stream.write_all(ping_response.as_bytes()) {
