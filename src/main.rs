@@ -44,7 +44,7 @@ fn handle_connection(mut stream: TcpStream) {
         match stream.read(&mut read_buf) {
             Ok(_n) => {
                 handle_data(&mut stream, &read_buf);
-                thread::sleep(Duration::from_secs_f64(0.05));
+                thread::sleep(Duration::from_secs_f64(0.5));
                 handle_data(&mut stream, &read_buf);
                 break;
             }
