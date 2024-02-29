@@ -51,6 +51,8 @@ fn handle_connection(mut stream: TcpStream) {
             Err(_) => todo!(),
         }
     }
+
+    thread::sleep(Duration::from_secs_f64(0.5));
 }
 
 fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
