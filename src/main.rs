@@ -12,7 +12,9 @@ fn main() {
         match stream {
             Ok(stream) => {
                 println!("New connection: {:?}", stream.peer_addr());
-                handle_connection(stream);
+                thread::spawn(move || {
+                    handle_connection(stream);
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
