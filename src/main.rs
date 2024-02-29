@@ -71,6 +71,10 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
         }
     }
 
+    // TODO:
+    // 1. handle all unwarps
+    // 2. support creating of `Resp` message from &str
+    // 3. clean up get and set operations
     fn handle_data(stream: &mut TcpStream, buf: &[u8], store: &Store) {
         let incoming_message =
             String::from_utf8(buf.to_owned()).expect("Failed to construct message");
