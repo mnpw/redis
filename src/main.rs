@@ -4,10 +4,10 @@ use std::{
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-type Store = Arc<Mutex<HashMap<String, String>>>;
+type Store = Arc<Mutex<HashMap<String, (String, Option<Instant>)>>>;
 
 fn init_store() -> Store {
     Arc::new(Mutex::new(HashMap::new()))
@@ -126,7 +126,21 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
         let key = it.next().unwrap().get_string().unwrap();
         let val = it.next().unwrap().get_string().unwrap();
         let mut s = store.lock().expect("Store is poisoned!");
-        s.insert(key, val);
+
+        let expiry: Option<usize> = match it.next() {
+            Some(exp) => {
+                if exp.get_string().unwrap().to_lowercase().contains("px") {
+                    it.next().unwrap().get_string().unwrap().parse().ok()
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
+
+        let expiry_time = expiry.map(|delta| Instant::now() + Duration::from_millis(delta as u64));
+
+        s.insert(key, (val, expiry_time));
         let _ = stream.write_all("+OK\r\n".as_bytes());
     }
 
@@ -136,10 +150,14 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
     {
         let key = it.next().unwrap().get_string().unwrap();
         let s = store.lock().expect("Store is poisoned!");
-        if let Some(val) = s.get(&key) {
-            let len = val.len();
-            let op = format!("${len}\r\n{val}\r\n");
-            let _ = stream.write_all(op.as_bytes());
+        if let Some((val, expiry)) = s.get(&key) {
+            if expiry.is_some() && expiry.unwrap() > Instant::now() {
+                let _ = stream.write_all("$-1\r\n".as_bytes());
+            } else {
+                let len = val.len();
+                let op = format!("${len}\r\n{val}\r\n");
+                let _ = stream.write_all(op.as_bytes());
+            }
         } else {
             let _ = stream.write_all("$-1\r\n".as_bytes());
         }
