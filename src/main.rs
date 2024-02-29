@@ -27,7 +27,7 @@ fn main() {
 // Note: `fn fn_name(var: mut Type)` is invalid. mut is used to denote mutability
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
-    let mut read_string = String::new();
+    let mut buf = [0; 1024];
     // // Sets TCP_NODELAY at kernel level. TCP_NODELAY basically disables Nagle's
     // // algorithm.
     // //
@@ -43,9 +43,9 @@ fn handle_connection(mut stream: TcpStream) {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
-        match stream.read_to_string(&mut read_string) {
+        match stream.read(&mut buf) {
             Ok(n) => {
-                println!("buffer: {read_string:?}");
+                println!("buffer: {buf:?}");
                 if n == 0 {
                     println!("waiting for more data...");
                     thread::sleep(Duration::from_secs_f64(0.5));
