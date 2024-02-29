@@ -43,7 +43,7 @@ fn handle_connection(mut stream: TcpStream) {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
-        match stream.read(&mut read_buf) {
+        match stream.read_to_end(&mut read_buf) {
             Ok(n) => {
                 println!("buffer: {read_buf:?}");
                 if n == 0 {
