@@ -1,6 +1,8 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    thread,
+    time::Duration,
 };
 
 fn main() {
@@ -41,6 +43,8 @@ fn handle_connection(mut stream: TcpStream) {
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut read_buf) {
             Ok(_n) => {
+                handle_data(&mut stream, &read_buf);
+                thread::sleep(Duration::from_secs_f64(0.05));
                 handle_data(&mut stream, &read_buf);
                 break;
             }
