@@ -28,16 +28,16 @@ fn main() {
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
     let mut read_string = String::new();
-    // Sets TCP_NODELAY at kernel level. TCP_NODELAY basically disables Nagle's
-    // algorithm.
-    //
-    // Nagle's algorithm combines several small outgoing messages and sends them
-    // as a single packet to reduce the number of packets sent. This is
-    // beneficial for reducing network congestion but can introduce latency.
-    //
-    // Disabling it with TCP_NODELAY is useful for applications that require
-    // low latency and send small packets frequently.
-    stream.set_nodelay(true).unwrap();
+    // // Sets TCP_NODELAY at kernel level. TCP_NODELAY basically disables Nagle's
+    // // algorithm.
+    // //
+    // // Nagle's algorithm combines several small outgoing messages and sends them
+    // // as a single packet to reduce the number of packets sent. This is
+    // // beneficial for reducing network congestion but can introduce latency.
+    // //
+    // // Disabling it with TCP_NODELAY is useful for applications that require
+    // // low latency and send small packets frequently.
+    // stream.set_nodelay(true).unwrap();
 
     loop {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
