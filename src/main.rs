@@ -152,7 +152,7 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
         let key = it.next().unwrap().get_string().unwrap();
         let s = store.lock().expect("Store is poisoned!");
         if let Some((val, expiry)) = s.get(&key) {
-            if expiry.is_some() && expiry.unwrap() > Instant::now() {
+            if expiry.is_some() && Instant::now() > expiry.unwrap() {
                 let _ = stream.write_all("$-1\r\n".as_bytes());
             } else {
                 let len = val.len();
