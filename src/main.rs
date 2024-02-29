@@ -65,7 +65,7 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
                     continue;
                 }
                 handle_data(&mut stream, &buf, &store);
-                buf.clear();
+                buf.iter_mut().for_each(|x| *x = 0);
             }
             Err(_) => todo!(),
         }
