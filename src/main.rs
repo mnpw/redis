@@ -63,7 +63,9 @@ fn handle_connection(mut stream: TcpStream) {
 }
 
 fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
-    let incoming_message = String::from_utf8(buf.to_owned()).expect("Failed to construct message");
+    let incoming_message = String::from_utf8(buf.to_owned())
+        .expect("Failed to construct message")
+        .trim_end();
     println!("incoming message: {incoming_message:?}");
     let ping_response = "+PONG\r\n";
 
