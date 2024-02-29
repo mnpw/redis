@@ -27,8 +27,11 @@ fn main() {
 // Note: `fn fn_name(var: mut Type)` is invalid. mut is used to denote mutability
 // of variables and references, not types.
 fn handle_connection(mut stream: TcpStream) {
-    // let mut buf = Vec::with_capacity(1024);
-    let mut buf = [0; 1024];
+    // Note: The buffer onto which TcpStream::read function is called must have
+    // non-zero len! Initializing buffer like `let mut buffer =
+    // Vec::with_capacity(1024)` will not work since the lenght of buffer will
+    // still be zero.
+    let mut buf = vec![0; 1024];
     // // Sets TCP_NODELAY at kernel level. TCP_NODELAY basically disables Nagle's
     // // algorithm.
     // //
@@ -38,7 +41,7 @@ fn handle_connection(mut stream: TcpStream) {
     // //
     // // Disabling it with TCP_NODELAY is useful for applications that require
     // // low latency and send small packets frequently.
-    // stream.set_nodelay(true).unwrap();
+    stream.set_nodelay(true).unwrap();
 
     loop {
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
@@ -46,21 +49,22 @@ fn handle_connection(mut stream: TcpStream) {
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut buf) {
             Ok(n) => {
-                println!("n: {n}, buffer: {buf:?}");
                 if n == 0 {
                     println!("waiting for more data...");
                     thread::sleep(Duration::from_secs_f64(0.5));
                     continue;
                 }
                 println!("sending pong...");
-                handle_data(&mut stream);
+                handle_data(&mut stream, &buf);
             }
             Err(_) => todo!(),
         }
     }
 }
 
-fn handle_data(stream: &mut TcpStream) {
+fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
+    let incoming_message = String::from_utf8(buf.to_owned()).expect("Failed to construct message");
+    println!("incoming message: {incoming_message}");
     let ping_response = "+PONG\r\n";
 
     match stream.write_all(ping_response.as_bytes()) {
