@@ -46,6 +46,8 @@ fn handle_connection(mut stream: TcpStream) {
                 handle_data(&mut stream, &read_buf);
                 thread::sleep(Duration::from_secs_f64(0.5));
                 handle_data(&mut stream, &read_buf);
+                thread::sleep(Duration::from_secs_f64(0.5));
+                handle_data(&mut stream, &read_buf);
                 thread::sleep(Duration::from_secs_f64(1.0));
                 break;
             }
