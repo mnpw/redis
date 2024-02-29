@@ -36,18 +36,11 @@ fn handle_connection(mut stream: TcpStream) {
     stream.set_nodelay(true).unwrap();
 
     loop {
-        // thread::sleep(std::time::Duration::from_millis(500));
         // Rust differentiates between Vec<T> and &mut Vec<T>. Implicit coercion
         // from Vec<T> to &mut Vec<T> doesn't occur, but &mut Vec<T> can be coerced
         // to &mut U if Vec<T> implements DerefMut<Target=U>.
         match stream.read(&mut read_buf) {
-            Ok(n) => {
-                // Check if no bytes were read from the stream
-                // if n == 0 {
-                //     println!("Sleeping to read more data");
-                //     thread::sleep(std::time::Duration::from_millis(500));
-                //     continue;
-                // }
+            Ok(_n) => {
                 handle_data(&mut stream, &read_buf);
                 break;
             }
@@ -58,11 +51,10 @@ fn handle_connection(mut stream: TcpStream) {
 
 fn handle_data(stream: &mut TcpStream, read_buf: &[u8]) {
     let res = String::from_utf8(read_buf.to_owned()).unwrap();
-    println!("{res:?}");
+    println!("Client says: {res:?}");
 
     let ping_response = "+PONG\r\n";
 
-    // if res.contains("PING") {
     match stream.write_all(ping_response.as_bytes()) {
         Ok(()) => {
             println!("Successfully ponged!");
