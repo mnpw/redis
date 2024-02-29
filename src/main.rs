@@ -66,24 +66,126 @@ fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
     let incoming_message = String::from_utf8(buf.to_owned()).expect("Failed to construct message");
     let incoming_message = incoming_message.trim_end().trim_end_matches('\0');
     println!("incoming message: {incoming_message:?}");
-    let ping_response = "+PONG\r\n";
 
-    if incoming_message.contains("ping") {
-        match stream.write_all(ping_response.as_bytes()) {
-            Ok(()) => {
-                println!("Successfully ponged!");
-            }
-            _ => {
-                println!("Failed to pong :(")
+    let (resp, _residual) = Resp::new(incoming_message);
+    match resp {
+        Resp::SimpleString(s) => {
+            if s.to_lowercase().contains("ping") {
+                let _ = stream.write_all("+PONG\r\n".as_bytes());
             }
         }
+        Resp::BulkString(s) => {
+            if s.to_lowercase().contains("ping") {
+                let _ = stream.write_all("+PONG\r\n".as_bytes());
+            }
+        }
+        Resp::Array(arr) => {
+            let mut arr_iter = arr.iter();
+            // check if first message is echo
+            if let Some(tp) = arr_iter.next() {
+                let message = match tp.as_ref() {
+                    Resp::SimpleString(s) => s,
+                    Resp::BulkString(s) => s,
+                    _ => unreachable!(),
+                };
+
+                if message.to_lowercase().contains("echo") {
+                    // if there is a second message then take it and write that message back
+                    if let Some(mes) = arr_iter.next() {
+                        let message = match mes.as_ref() {
+                            Resp::SimpleString(s) => s,
+                            Resp::BulkString(s) => s,
+                            _ => unreachable!(),
+                        };
+                        let size = message.len();
+                        let op = format!("${size}\r\n{message}\r\n");
+                        let _ = stream.write_all(op.as_bytes());
+                    }
+                }
+            }
+        }
+    };
+}
+
+/// Implementation of the REDIS protocol
+#[derive(Debug, PartialEq, Eq)]
+enum Resp {
+    SimpleString(String),
+    BulkString(String),
+    Array(Vec<Box<Resp>>),
+}
+
+impl Resp {
+    // Returns data type and residual data if any
+    pub fn new(input: &str) -> (Self, String) {
+        let (message_type, data) = input.split_at(1);
+
+        match message_type {
+            "+" => {
+                let (d, res) = Self::parse_simple_string(data);
+                (Resp::SimpleString(d), res)
+            }
+            "$" => {
+                let (d, res) = Self::parse_bulk_string(data);
+                (Resp::BulkString(d), res)
+            }
+            "*" => {
+                let (d, res) = Self::parse_array(data);
+                (Resp::Array(d), res)
+            }
+            _ => todo!(),
+        }
+    }
+
+    fn parse_simple_string(input: &str) -> (String, String) {
+        let (data, residual) = input.split_once("\r\n").unwrap();
+        (data.to_owned(), residual.to_owned())
+    }
+
+    fn parse_bulk_string(input: &str) -> (String, String) {
+        let (data, residual) = input.split_once("\r\n").unwrap();
+        let size: usize = data.parse().unwrap();
+
+        let (data, residual) = residual.split_once("\r\n").unwrap();
+        assert_eq!(size, data.len());
+
+        (data.to_owned(), residual.to_owned())
+    }
+
+    fn parse_array(input: &str) -> (Vec<Box<Resp>>, String) {
+        let (data, residual) = input.split_once("\r\n").unwrap();
+        let size: usize = data.parse().unwrap();
+
+        let mut elements = Vec::new();
+        let mut residual = residual.to_owned();
+
+        for _ in 0..size {
+            let (item, res) = Resp::new(&residual);
+            elements.push(Box::new(item));
+            residual = res;
+        }
+
+        (elements, residual.to_owned())
     }
 }
 
 #[test]
-fn testing() {
-    let data = [42, 49, 13, 10, 36, 52, 13, 10, 112, 105, 110, 103, 13, 10];
-    let s = String::from_utf8(data.to_vec()).unwrap();
+fn resp_test() {
+    let simple = "+PONG\r\n";
+    let (result, _) = Resp::new(simple);
+    assert_eq!(result, Resp::SimpleString("PONG".to_owned()));
 
-    println!("{s:?} {}", s.contains("ping"));
+    let bulk = "$5\r\nhello\r\n";
+    let (result, _) = Resp::new(bulk);
+    assert_eq!(result, Resp::BulkString("hello".to_owned()));
+
+    let array = "*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n";
+    let (result, _) = Resp::new(array);
+    assert_eq!(
+        result,
+        Resp::Array(vec![
+            Box::new(Resp::BulkString("hello".to_owned())),
+            Box::new(Resp::BulkString("world".to_owned())),
+        ])
+    );
 }
