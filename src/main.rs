@@ -1,19 +1,29 @@
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
 
+type Store = Arc<Mutex<HashMap<String, String>>>;
+
+fn init_store() -> Store {
+    Arc::new(Mutex::new(HashMap::new()))
+}
+
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+    let store = init_store();
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("new connection: {:?}", stream.peer_addr());
+                let store = store.clone();
                 thread::spawn(move || {
-                    handle_connection(stream);
+                    handle_connection(stream, store);
                 });
             }
             Err(e) => {
@@ -26,7 +36,7 @@ fn main() {
 
 // Note: `fn fn_name(var: mut Type)` is invalid. mut is used to denote mutability
 // of variables and references, not types.
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream, store: Store) {
     // Note: The buffer onto which TcpStream::read function is called must have
     // non-zero len! Initializing buffer like `let mut buffer =
     // Vec::with_capacity(1024)` will not work since the lenght of buffer will
@@ -54,61 +64,86 @@ fn handle_connection(mut stream: TcpStream) {
                     thread::sleep(Duration::from_secs_f64(0.5));
                     continue;
                 }
-                println!("sending pong...");
-                handle_data(&mut stream, &buf);
+                handle_data(&mut stream, &buf, &store);
             }
             Err(_) => todo!(),
         }
     }
-}
 
-fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
-    let incoming_message = String::from_utf8(buf.to_owned()).expect("Failed to construct message");
-    let incoming_message = incoming_message.trim_end().trim_end_matches('\0');
-    println!("incoming message: {incoming_message:?}");
+    fn handle_data(stream: &mut TcpStream, buf: &[u8], store: &Store) {
+        let incoming_message =
+            String::from_utf8(buf.to_owned()).expect("Failed to construct message");
+        let incoming_message = incoming_message.trim_end().trim_end_matches('\0');
+        println!("incoming message: {incoming_message:?}");
 
-    let (resp, _residual) = Resp::new(incoming_message);
-    match resp {
-        Resp::SimpleString(s) => {
-            if s.to_lowercase().contains("ping") {
-                let _ = stream.write_all("+PONG\r\n".as_bytes());
-            }
-        }
-        Resp::BulkString(s) => {
-            if s.to_lowercase().contains("ping") {
-                let _ = stream.write_all("+PONG\r\n".as_bytes());
-            }
-        }
-        Resp::Array(arr) => {
-            let mut arr_iter = arr.iter();
-            // check if first message is echo
-            if let Some(tp) = arr_iter.next() {
-                let message = match tp.as_ref() {
-                    Resp::SimpleString(s) => s,
-                    Resp::BulkString(s) => s,
-                    _ => unreachable!(),
-                };
-
-                if message.to_lowercase().contains("echo") {
-                    // if there is a second message then take it and write that message back
-                    if let Some(mes) = arr_iter.next() {
-                        let message = match mes.as_ref() {
-                            Resp::SimpleString(s) => s,
-                            Resp::BulkString(s) => s,
-                            _ => unreachable!(),
-                        };
-                        let size = message.len();
-                        let op = format!("${size}\r\n{message}\r\n");
-                        let _ = stream.write_all(op.as_bytes());
-                    }
+        let (resp, _residual) = Resp::new(incoming_message);
+        match resp {
+            Resp::SimpleString(s) => {
+                if s.to_lowercase().contains("ping") {
+                    handle_ping(stream)
                 }
+            }
+            Resp::BulkString(s) => {
+                if s.to_lowercase().contains("ping") {
+                    handle_ping(stream)
+                }
+            }
+            Resp::Array(arr) => {
+                let mut arr_iter = arr.iter();
 
+                let message = arr_iter.next().unwrap().get_string().unwrap();
                 if message.contains("ping") {
-                    let _ = stream.write_all("+PONG\r\n".as_bytes());
+                    handle_ping(stream);
+                } else if message.to_lowercase().contains("echo") {
+                    handle_echo(stream, arr_iter);
+                } else if message.to_lowercase().contains("set") {
+                    handle_set(stream, arr_iter, store)
+                } else if message.to_lowercase().contains("get") {
+                    handle_get(stream, arr_iter, store)
                 }
             }
         }
-    };
+    }
+
+    fn handle_ping(stream: &mut TcpStream) {
+        let _ = stream.write_all("+PONG\r\n".as_bytes());
+    }
+
+    fn handle_echo<'a, T>(stream: &mut TcpStream, mut it: T)
+    where
+        T: Iterator<Item = &'a Box<Resp>>,
+    {
+        let message = it.next().unwrap().get_string().unwrap();
+        let len = message.len();
+        let op = format!("${len}\r\n{message}\r\n");
+        let _ = stream.write_all(op.as_bytes());
+    }
+
+    fn handle_set<'a, T>(stream: &mut TcpStream, mut it: T, store: &Store)
+    where
+        T: Iterator<Item = &'a Box<Resp>>,
+    {
+        let key = it.next().unwrap().get_string().unwrap();
+        let val = it.next().unwrap().get_string().unwrap();
+        let mut s = store.lock().expect("Store is poisoned!");
+        s.insert(key, val);
+        let _ = stream.write_all("+OK\r\n".as_bytes());
+    }
+
+    fn handle_get<'a, T>(stream: &mut TcpStream, mut it: T, store: &Store)
+    where
+        T: Iterator<Item = &'a Box<Resp>>,
+    {
+        let key = it.next().unwrap().get_string().unwrap();
+        let s = store.lock().expect("Store is poisoned!");
+        if let Some(val) = s.get(&key) {
+            let len = val.len();
+            let op = format!("${len}\r\n{val}\r\n");
+            let _ = stream.write_all(op.as_bytes());
+        } else {
+            let _ = stream.write_all("$-1\r\n".as_bytes());
+        }
+    }
 }
 
 /// Implementation of the REDIS protocol
@@ -138,6 +173,14 @@ impl Resp {
                 (Resp::Array(d), res)
             }
             _ => todo!(),
+        }
+    }
+
+    fn get_string(&self) -> Option<String> {
+        match self {
+            Resp::SimpleString(s) => Some(s.to_owned()),
+            Resp::BulkString(s) => Some(s.to_owned()),
+            _ => None,
         }
     }
 
