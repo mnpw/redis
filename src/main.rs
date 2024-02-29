@@ -64,17 +64,25 @@ fn handle_connection(mut stream: TcpStream) {
 
 fn handle_data(stream: &mut TcpStream, buf: &[u8]) {
     let incoming_message = String::from_utf8(buf.to_owned()).expect("Failed to construct message");
-    println!("incoming message: {incoming_message}");
+    println!("incoming message: {incoming_message:?}");
     let ping_response = "+PONG\r\n";
 
-    match stream.write_all(ping_response.as_bytes()) {
-        Ok(()) => {
-            println!("Successfully ponged!");
-        }
-        _ => {
-            println!("Failed to pong :(")
+    if incoming_message.contains("ping") {
+        match stream.write_all(ping_response.as_bytes()) {
+            Ok(()) => {
+                println!("Successfully ponged!");
+            }
+            _ => {
+                println!("Failed to pong :(")
+            }
         }
     }
+}
 
-    stream.flush().unwrap();
+#[test]
+fn testing() {
+    let data = [42, 49, 13, 10, 36, 52, 13, 10, 112, 105, 110, 103, 13, 10];
+    let s = String::from_utf8(data.to_vec()).unwrap();
+
+    println!("{s:?} {}", s.contains("ping"));
 }
