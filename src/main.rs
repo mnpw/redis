@@ -139,6 +139,8 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
                     handle_ping(stream);
                 } else if message.contains("echo") {
                     handle_echo(stream, arr_iter);
+                } else if message.contains("info") {
+                    handle_info(stream, arr_iter)
                 } else if message.contains("set") {
                     handle_set(stream, arr_iter, store)
                 } else if message.contains("get") {
@@ -160,6 +162,17 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
         let len = message.len();
         let op = format!("${len}\r\n{message}\r\n");
         let _ = stream.write_all(op.as_bytes());
+    }
+
+    fn handle_info<'a, T>(stream: &mut TcpStream, mut it: T)
+    where
+        T: Iterator<Item = &'a Box<Resp>>,
+    {
+        let info_type = it.next().unwrap().get_string().unwrap();
+        if info_type == "replication" {
+            let op = format!("$11\r\nrole:master\r\n");
+            let _ = stream.write_all(op.as_bytes());
+        }
     }
 
     fn handle_set<'a, T>(stream: &mut TcpStream, mut it: T, store: &Store)
