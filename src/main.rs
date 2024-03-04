@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env::{args, Args},
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
@@ -13,8 +14,39 @@ fn init_store() -> Store {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
+struct Config {
+    host: String,
+    port: u16,
+}
+
+impl Config {
+    fn default() -> Config {
+        Config {
+            host: "127.0.0.1".to_owned(),
+            port: 6379,
+        }
+    }
+
+    fn with_args(mut args: Args) -> Config {
+        let mut base = Self::default();
+
+        while let Some(item) = args.next() {
+            if item.to_lowercase().contains("--port") {
+                let custom_port = args.next().expect("flag present but no value");
+                let custom_port: u16 = custom_port.parse().unwrap();
+
+                base.port = custom_port
+            }
+        }
+
+        base
+    }
+}
+
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+    let config = Config::with_args(args());
+
+    let listener = TcpListener::bind((config.host, config.port)).unwrap();
     let store = init_store();
 
     for stream in listener.incoming() {
@@ -96,14 +128,20 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
             Resp::Array(arr) => {
                 let mut arr_iter = arr.iter();
 
-                let message = arr_iter.next().unwrap().get_string().unwrap();
+                let message = arr_iter
+                    .next()
+                    .unwrap()
+                    .get_string()
+                    .unwrap()
+                    .to_lowercase();
+
                 if message.contains("ping") {
                     handle_ping(stream);
-                } else if message.to_lowercase().contains("echo") {
+                } else if message.contains("echo") {
                     handle_echo(stream, arr_iter);
-                } else if message.to_lowercase().contains("set") {
+                } else if message.contains("set") {
                     handle_set(stream, arr_iter, store)
-                } else if message.to_lowercase().contains("get") {
+                } else if message.contains("get") {
                     handle_get(stream, arr_iter, store)
                 }
             }
