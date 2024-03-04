@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env::{args, Args},
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{Ipv4Addr, TcpListener, TcpStream, ToSocketAddrs},
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -17,6 +17,7 @@ fn init_store() -> Store {
 struct Config {
     host: String,
     port: u16,
+    replica: Option<(String, u16)>,
 }
 
 impl Config {
@@ -24,6 +25,7 @@ impl Config {
         Config {
             host: "127.0.0.1".to_owned(),
             port: 6379,
+            replica: None,
         }
     }
 
@@ -32,10 +34,18 @@ impl Config {
 
         while let Some(item) = args.next() {
             if item.to_lowercase().contains("--port") {
-                let custom_port = args.next().expect("flag present but no value");
+                let custom_port = args.next().expect("port: flag present but no value");
                 let custom_port: u16 = custom_port.parse().unwrap();
 
                 base.port = custom_port
+            }
+
+            if item.to_lowercase().contains("--replicaof") {
+                let host = args.next().expect("replicao: flag present but no value");
+                let port = args.next().expect("replicao: flag present but no value");
+                let port: u16 = port.parse().unwrap();
+
+                base.replica = Some((host, port))
             }
         }
 
@@ -45,22 +55,51 @@ impl Config {
 
 fn main() {
     let config = Config::with_args(args());
-
-    let listener = TcpListener::bind((config.host, config.port)).unwrap();
     let store = init_store();
+}
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                println!("new connection: {:?}", stream.peer_addr());
-                let store = store.clone();
-                thread::spawn(move || {
-                    handle_connection(stream, store);
-                });
-            }
-            Err(e) => {
-                println!("error: {}", e);
-                break;
+#[derive(Clone)]
+enum Role {
+    Master,
+    Slave((String, u16)),
+}
+
+struct Server {
+    role: Role,
+    listener: TcpListener,
+    store: Store,
+}
+
+impl Server {
+    fn init(config: Config, store: Store) -> Self {
+        let listener = TcpListener::bind((config.host, config.port)).unwrap();
+        let role = match config.replica {
+            Some((host, port)) => Role::Slave((host, port)),
+            None => Role::Master,
+        };
+
+        Server {
+            role,
+            listener,
+            store,
+        }
+    }
+
+    fn start(self) {
+        for stream in self.listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    println!("new connection: {:?}", stream.peer_addr());
+                    let store = self.store.clone();
+                    let role = self.role.clone();
+                    thread::spawn(move || {
+                        handle_connection(stream, store, role);
+                    });
+                }
+                Err(e) => {
+                    println!("error: {}", e);
+                    break;
+                }
             }
         }
     }
@@ -68,7 +107,7 @@ fn main() {
 
 // Note: `fn fn_name(var: mut Type)` is invalid. mut is used to denote mutability
 // of variables and references, not types.
-fn handle_connection(mut stream: TcpStream, store: Store) {
+fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
     // Note: The buffer onto which TcpStream::read function is called must have
     // non-zero len! Initializing buffer like `let mut buffer =
     // Vec::with_capacity(1024)` will not work since the lenght of buffer will
@@ -96,7 +135,7 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
                     thread::sleep(Duration::from_secs_f64(0.5));
                     continue;
                 }
-                handle_data(&mut stream, &buf, &store);
+                handle_data(&mut stream, &buf, &store, &role);
                 buf.iter_mut().for_each(|x| *x = 0);
             }
             Err(_) => todo!(),
@@ -107,7 +146,7 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
     // 1. handle all unwarps
     // 2. support creating of `Resp` message from &str
     // 3. clean up get and set operations
-    fn handle_data(stream: &mut TcpStream, buf: &[u8], store: &Store) {
+    fn handle_data(stream: &mut TcpStream, buf: &[u8], store: &Store, role: &Role) {
         let incoming_message =
             String::from_utf8(buf.to_owned()).expect("Failed to construct message");
         let incoming_message = incoming_message.trim_end().trim_end_matches('\0');
@@ -140,7 +179,7 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
                 } else if message.contains("echo") {
                     handle_echo(stream, arr_iter);
                 } else if message.contains("info") {
-                    handle_info(stream, arr_iter)
+                    handle_info(stream, arr_iter, role)
                 } else if message.contains("set") {
                     handle_set(stream, arr_iter, store)
                 } else if message.contains("get") {
@@ -164,13 +203,17 @@ fn handle_connection(mut stream: TcpStream, store: Store) {
         let _ = stream.write_all(op.as_bytes());
     }
 
-    fn handle_info<'a, T>(stream: &mut TcpStream, mut it: T)
+    fn handle_info<'a, T>(stream: &mut TcpStream, mut it: T, role: &Role)
     where
         T: Iterator<Item = &'a Box<Resp>>,
     {
         let info_type = it.next().unwrap().get_string().unwrap();
         if info_type == "replication" {
-            let op = format!("$11\r\nrole:master\r\n");
+            let op = match role {
+                Role::Master => format!("$11\r\nrole:master\r\n"),
+                Role::Slave(_) => format!("$10\r\nrole:slave\r\n"),
+            };
+
             let _ = stream.write_all(op.as_bytes());
         }
     }
