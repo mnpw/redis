@@ -56,6 +56,9 @@ impl Config {
 fn main() {
     let config = Config::with_args(args());
     let store = init_store();
+    let server = Server::init(config, store);
+
+    server.start();
 }
 
 #[derive(Clone)]
