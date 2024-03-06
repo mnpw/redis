@@ -1,12 +1,14 @@
 use std::{
     collections::HashMap,
-    env::{args, Args},
     io::{Read, Write},
-    net::{Ipv4Addr, TcpListener, TcpStream, ToSocketAddrs},
+    net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
+
+use clap::Parser;
+use rand::{distributions::Alphanumeric, Rng};
 
 type Store = Arc<Mutex<HashMap<String, (String, Option<Instant>)>>>;
 
@@ -14,47 +16,18 @@ fn init_store() -> Store {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
+#[derive(Parser, Debug)]
 struct Config {
+    #[arg(long, default_value = "127.0.0.1")]
     host: String,
+    #[arg(long, default_value_t = 6379)]
     port: u16,
-    replica: Option<(String, u16)>,
-}
-
-impl Config {
-    fn default() -> Config {
-        Config {
-            host: "127.0.0.1".to_owned(),
-            port: 6379,
-            replica: None,
-        }
-    }
-
-    fn with_args(mut args: Args) -> Config {
-        let mut base = Self::default();
-
-        while let Some(item) = args.next() {
-            if item.to_lowercase().contains("--port") {
-                let custom_port = args.next().expect("port: flag present but no value");
-                let custom_port: u16 = custom_port.parse().unwrap();
-
-                base.port = custom_port
-            }
-
-            if item.to_lowercase().contains("--replicaof") {
-                let host = args.next().expect("replicao: flag present but no value");
-                let port = args.next().expect("replicao: flag present but no value");
-                let port: u16 = port.parse().unwrap();
-
-                base.replica = Some((host, port))
-            }
-        }
-
-        base
-    }
+    #[arg(long, num_args = 2, value_name = "REPLICA_HOST REPLICA_PORT")]
+    replicaof: Option<Vec<String>>,
 }
 
 fn main() {
-    let config = Config::with_args(args());
+    let config = dbg!(Config::parse());
     let store = init_store();
     let server = Server::init(config, store);
 
@@ -63,7 +36,10 @@ fn main() {
 
 #[derive(Clone)]
 enum Role {
-    Master,
+    Master {
+        master_replid: String,
+        master_repl_offset: usize,
+    },
     Slave((String, u16)),
 }
 
@@ -76,9 +52,25 @@ struct Server {
 impl Server {
     fn init(config: Config, store: Store) -> Self {
         let listener = TcpListener::bind((config.host, config.port)).unwrap();
-        let role = match config.replica {
-            Some((host, port)) => Role::Slave((host, port)),
-            None => Role::Master,
+        let role = match config.replicaof {
+            Some(replica) => {
+                let host = replica.first().expect("shoud contain host");
+                let port = replica.last().expect("should contain port");
+                let port: u16 = port.parse().expect("port should be valid");
+                Role::Slave((host.to_owned(), port))
+            }
+            None => {
+                let random_string: String = rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(40)
+                    .map(char::from)
+                    .collect();
+
+                Role::Master {
+                    master_replid: random_string,
+                    master_repl_offset: 0,
+                }
+            }
         };
 
         Server {
@@ -213,7 +205,13 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         let info_type = it.next().unwrap().get_string().unwrap();
         if info_type == "replication" {
             let op = match role {
-                Role::Master => format!("$11\r\nrole:master\r\n"),
+                Role::Master {
+                    master_replid,
+                    master_repl_offset,
+                } => {
+                    let count = 11 + 1 + 54 + 1 + 20;
+                    format!("${count}\r\nrole:master\nmaster_replid:{master_replid}\nmaster_repl_offset:{master_repl_offset}\r\n")
+                }
                 Role::Slave(_) => format!("$10\r\nrole:slave\r\n"),
             };
 
