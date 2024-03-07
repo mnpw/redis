@@ -83,7 +83,7 @@ impl Server {
     }
 
     fn init_handshake(self_port: u16, host: &String, port: u16) {
-        let mut read_buf = String::new();
+        let mut read_buf = vec![0; 1024];
         let mut stream =
             TcpStream::connect((host.to_owned(), port)).expect("failed to connect to master");
 
@@ -93,14 +93,14 @@ impl Server {
         stream
             .write_all(op.as_bytes())
             .expect("should be able to write to master");
-        // stream
-        //     .read_to_string(&mut read_buf)
-        //     .expect("should get some message");
-        // if !read_buf.to_lowercase().contains("pong") {
-        //     println!("{read_buf:?}");
-        //     panic!("did not receive pong");
-        // }
-        // read_buf.clear();
+        let _ = stream.read(&mut read_buf).expect("should get some message");
+        println!("read_buf: {read_buf:?}");
+        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+        println!("resp: {resp:?}");
+        if !resp.contains("pong") {
+            panic!("did not receive pong");
+        }
+        read_buf.clear();
 
         // Do REPLCONF
         println!("init first replconf");
@@ -111,13 +111,14 @@ impl Server {
         stream
             .write_all(op.as_bytes())
             .expect("should be able to write to master");
-        stream
-            .read_to_string(&mut read_buf)
-            .expect("should get some message");
-        if !read_buf.to_lowercase().contains("ok") {
-            println!("{read_buf:?}");
+        let _ = stream.read(&mut read_buf).expect("should get some message");
+        println!("read_buf: {read_buf:?}");
+        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+        println!("resp: {resp:?}");
+        if !resp.contains("ok") {
             panic!("did not receive ok");
         }
+        read_buf.clear();
 
         // Do REPLCONF
         println!("init second replconf");
@@ -125,13 +126,14 @@ impl Server {
         stream
             .write_all(op.as_bytes())
             .expect("should be able to write to master");
-        stream
-            .read_to_string(&mut read_buf)
-            .expect("should get some message");
-        if !read_buf.to_lowercase().contains("ok") {
-            println!("{read_buf:?}");
+        let _ = stream.read(&mut read_buf).expect("should get some message");
+        println!("read_buf: {read_buf:?}");
+        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+        println!("resp: {resp:?}");
+        if !resp.contains("ok") {
             panic!("did not receive ok");
         }
+        read_buf.clear();
     }
 
     fn start(self) {
