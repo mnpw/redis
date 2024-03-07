@@ -57,6 +57,7 @@ impl Server {
                 let host = replica.first().expect("shoud contain host");
                 let port = replica.last().expect("should contain port");
                 let port: u16 = port.parse().expect("port should be valid");
+                Server::init_handshake(host, port);
                 Role::Slave((host.to_owned(), port))
             }
             None => {
@@ -78,6 +79,15 @@ impl Server {
             listener,
             store,
         }
+    }
+
+    fn init_handshake(host: &String, port: u16) {
+        let mut stream =
+            TcpStream::connect((host.to_owned(), port)).expect("failed to connect to master");
+        let op = format!("*1\r\n$4\r\nping\r\n");
+        stream
+            .write_all(op.as_bytes())
+            .expect("should be able to write to master");
     }
 
     fn start(self) {
