@@ -97,7 +97,7 @@ impl Server {
         println!("read_buf: {read_buf:?}");
         let resp = String::from_utf8(read_buf.to_owned()).unwrap();
         println!("resp: {resp:?}");
-        if !resp.contains("pong") {
+        if !resp.to_lowercase().contains("pong") {
             panic!("did not receive pong");
         }
         read_buf.clear();
@@ -115,7 +115,7 @@ impl Server {
         println!("read_buf: {read_buf:?}");
         let resp = String::from_utf8(read_buf.to_owned()).unwrap();
         println!("resp: {resp:?}");
-        if !resp.contains("ok") {
+        if !resp.to_lowercase().contains("ok") {
             panic!("did not receive ok");
         }
         read_buf.clear();
@@ -130,7 +130,7 @@ impl Server {
         println!("read_buf: {read_buf:?}");
         let resp = String::from_utf8(read_buf.to_owned()).unwrap();
         println!("resp: {resp:?}");
-        if !resp.contains("ok") {
+        if !resp.to_lowercase().contains("ok") {
             panic!("did not receive ok");
         }
         read_buf.clear();
