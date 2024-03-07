@@ -143,11 +143,11 @@ impl Server {
             .expect("should be able to write to master");
         let _ = stream.read(&mut read_buf).expect("should get some message");
         println!("read_buf: {read_buf:?}");
-        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
-        println!("resp: {resp:?}");
-        if !resp.to_lowercase().contains("fullresync") {
-            panic!("did not receive fullresync");
-        }
+        // let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+        // println!("resp: {resp:?}");
+        // if !resp.to_lowercase().contains("fullresync") {
+        //     panic!("did not receive fullresync");
+        // }
     }
 
     fn start(self) {
@@ -423,4 +423,21 @@ fn resp_test() {
             Box::new(Resp::BulkString("world".to_owned())),
         ])
     );
+}
+
+#[test]
+fn decode() {
+    let buf = [
+        43, 70, 85, 76, 76, 82, 69, 83, 89, 78, 67, 32, 120, 117, 116, 100, 100, 48, 106, 117, 48,
+        52, 48, 102, 118, 99, 122, 115, 98, 108, 114, 98, 49, 106, 113, 106, 101, 54, 108, 98, 106,
+        107, 115, 116, 55, 119, 120, 122, 99, 56, 113, 113, 32, 48, 13, 10, 36, 56, 56, 13, 10, 82,
+        69, 68, 73, 83, 48, 48, 49, 49, 250, 9, 114, 101, 100, 105, 115, 45, 118, 101, 114, 5, 55,
+        46, 50, 46, 48, 250, 10, 114, 101, 100, 105, 115, 45, 98, 105, 116, 115, 192, 64, 250, 5,
+        99, 116, 105, 109, 101, 194, 109, 8, 188, 101, 250, 8, 117, 115, 101, 100, 45, 109, 101,
+        109, 194, 176, 196, 16, 0, 250, 8, 97, 111, 102, 45, 98, 97, 115, 101, 192, 0, 255, 240,
+        110, 59, 254, 192, 255, 90, 162, 0,
+    ];
+
+    let string = String::from_utf16(&buf.to_vec()).unwrap();
+    println!("{string:?}");
 }
