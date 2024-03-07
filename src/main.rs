@@ -88,18 +88,19 @@ impl Server {
             TcpStream::connect((host.to_owned(), port)).expect("failed to connect to master");
 
         // Do PING
+        println!("init ping");
         let op = format!("*1\r\n$4\r\nping\r\n");
         stream
             .write_all(op.as_bytes())
             .expect("should be able to write to master");
-        stream
-            .read_to_string(&mut read_buf)
-            .expect("should get some message");
-        if !read_buf.to_lowercase().contains("pong") {
-            println!("{read_buf:?}");
-            panic!("did not receive pong");
-        }
-        read_buf.clear();
+        // stream
+        //     .read_to_string(&mut read_buf)
+        //     .expect("should get some message");
+        // if !read_buf.to_lowercase().contains("pong") {
+        //     println!("{read_buf:?}");
+        //     panic!("did not receive pong");
+        // }
+        // read_buf.clear();
 
         // Do REPLCONF
         let op = format!(
