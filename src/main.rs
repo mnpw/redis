@@ -134,6 +134,20 @@ impl Server {
             panic!("did not receive ok");
         }
         // read_buf.iter_mut().for_each(|x| *x = 0);
+
+        // Do PSYNC
+        println!("init psync");
+        let op = format!("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n");
+        stream
+            .write_all(op.as_bytes())
+            .expect("should be able to write to master");
+        let _ = stream.read(&mut read_buf).expect("should get some message");
+        println!("read_buf: {read_buf:?}");
+        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+        println!("resp: {resp:?}");
+        if !resp.to_lowercase().contains("fullresync") {
+            panic!("did not receive fullresync");
+        }
     }
 
     fn start(self) {
