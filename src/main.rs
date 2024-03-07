@@ -100,7 +100,7 @@ impl Server {
         if !resp.to_lowercase().contains("pong") {
             panic!("did not receive pong");
         }
-        read_buf.clear();
+        // read_buf.iter_mut().for_each(|x| *x = 0);
 
         // Do REPLCONF
         println!("init first replconf");
@@ -118,7 +118,7 @@ impl Server {
         if !resp.to_lowercase().contains("ok") {
             panic!("did not receive ok");
         }
-        read_buf.clear();
+        // read_buf.iter_mut().for_each(|x| *x = 0);
 
         // Do REPLCONF
         println!("init second replconf");
@@ -133,7 +133,7 @@ impl Server {
         if !resp.to_lowercase().contains("ok") {
             panic!("did not receive ok");
         }
-        read_buf.clear();
+        // read_buf.iter_mut().for_each(|x| *x = 0);
     }
 
     fn start(self) {
