@@ -368,7 +368,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         T: Iterator<Item = &'a Resp>,
     {
         let op = format!("+FULLRESYNC {REPL_ID} 0\r\n");
-        let _ = stream.write_all(op.as_bytes());
+        let _ = stream.write(op.as_bytes());
         thread::sleep(Duration::from_secs_f64(0.5));
         let rdb = BASE64_STANDARD.decode(RDB_64).unwrap();
         let rdb_str: String = rdb.iter().map(|n| format!("{n:08b}")).collect();
