@@ -372,6 +372,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         let rdb = BASE64_STANDARD.decode(RDB_64).unwrap();
         let rdb_str: String = rdb.iter().map(|n| format!("{n:08b}")).collect();
         let op = format!("${}\r\n{}", rdb.len(), rdb_str);
+        println!("writing: {op}");
         let _ = stream.write_all(op.as_bytes());
     }
 }
