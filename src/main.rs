@@ -370,7 +370,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         let op = format!("+FULLRESYNC {REPL_ID} 0\r\n");
         let _ = stream.write_all(op.as_bytes());
         let rdb = BASE64_STANDARD.decode(RDB_64).unwrap();
-        let rdb_str: String = rdb.iter().map(|n| n.to_string()).collect();
+        let rdb_str: String = rdb.iter().map(|n| format!("{n:08b}")).collect();
         let op = format!("${}\r\n{}", rdb.len(), rdb_str);
         let _ = stream.write_all(op.as_bytes());
     }
