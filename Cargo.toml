@@ -25,3 +25,4 @@ thiserror = "1.0.32"                                # error handling
 tokio = { version = "1.23.0", features = ["full"] } # async networking
 clap = { version = "~4.4", features = ["derive"] }
 rand = "0.8.5"
+base64 = "0.22.0"
