@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::format,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
@@ -7,12 +8,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+use base64::prelude::*;
 use clap::Parser;
 use rand::{distributions::Alphanumeric, Rng};
 
 type Store = Arc<Mutex<HashMap<String, (String, Option<Instant>)>>>;
 
 const REPL_ID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+const RDB_64: &str = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==";
 
 fn init_store() -> Store {
     Arc::new(Mutex::new(HashMap::new()))
@@ -365,6 +368,10 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         T: Iterator<Item = &'a Resp>,
     {
         let op = format!("+FULLRESYNC {REPL_ID} 0\r\n");
+        let _ = stream.write_all(op.as_bytes());
+        let rdb = BASE64_STANDARD.decode(RDB_64).unwrap();
+        let rdb_str: String = rdb.iter().map(|n| n.to_string()).collect();
+        let op = format!("${}\r\n{}", rdb.len(), rdb_str);
         let _ = stream.write_all(op.as_bytes());
     }
 }
