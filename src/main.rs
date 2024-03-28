@@ -375,8 +375,6 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         let len = rdb.len();
         let _ = stream.write(format!("${}\r\n", len).as_bytes());
         let _ = stream.write(&rdb);
-        println!("writing: {op}");
-        let _ = stream.write_all(op.as_bytes());
     }
 }
 
