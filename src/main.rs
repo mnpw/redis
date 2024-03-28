@@ -51,14 +51,12 @@ struct Server {
 
 impl Server {
     fn init(config: Config, store: Store) -> Self {
-        let listener = TcpListener::bind((config.host, config.port)).unwrap();
-        let role = match config.replicaof {
+        let listener = TcpListener::bind((config.host.to_owned(), config.port.to_owned())).unwrap();
+        let role = match &config.replicaof {
             Some(replica) => {
                 let host = replica.first().expect("shoud contain host");
                 let port = replica.last().expect("should contain port");
                 let port: u16 = port.parse().expect("port should be valid");
-                Server::init_handshake(config.port, host, port);
-                println!("handshake success");
                 Role::Slave((host.to_owned(), port))
             }
             None => {
@@ -75,6 +73,9 @@ impl Server {
             }
         };
 
+        Server::init_handshake(&config, &role);
+        println!("handshake success");
+
         Server {
             role,
             listener,
@@ -82,72 +83,82 @@ impl Server {
         }
     }
 
-    fn init_handshake(self_port: u16, host: &String, port: u16) {
-        let mut read_buf = vec![0; 1024];
-        let mut stream =
-            TcpStream::connect((host.to_owned(), port)).expect("failed to connect to master");
+    fn init_handshake(config: &Config, role: &Role) {
+        match role {
+            Role::Master {
+                master_replid,
+                master_repl_offset,
+            } => todo!(),
+            Role::Slave((master_host, master_port)) => {
+                let self_port = config.port;
+                let mut read_buf = vec![0; 1024];
+                let mut stream =
+                    TcpStream::connect((master_host.to_owned(), master_port.to_owned()))
+                        .expect("failed to connect to master");
 
-        // Do PING
-        println!("init ping");
-        let op = format!("*1\r\n$4\r\nping\r\n");
-        stream
-            .write_all(op.as_bytes())
-            .expect("should be able to write to master");
-        let _ = stream.read(&mut read_buf).expect("should get some message");
-        println!("read_buf: {read_buf:?}");
-        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
-        println!("resp: {resp:?}");
-        if !resp.to_lowercase().contains("pong") {
-            panic!("did not receive pong");
+                // Do PING
+                println!("init ping");
+                let op = format!("*1\r\n$4\r\nping\r\n");
+                stream
+                    .write_all(op.as_bytes())
+                    .expect("should be able to write to master");
+                let _ = stream.read(&mut read_buf).expect("should get some message");
+                println!("read_buf: {read_buf:?}");
+                let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+                println!("resp: {resp:?}");
+                if !resp.to_lowercase().contains("pong") {
+                    panic!("did not receive pong");
+                }
+                // read_buf.iter_mut().for_each(|x| *x = 0);
+
+                // Do REPLCONF
+                println!("init first replconf");
+                let op = format!(
+                    "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{}\r\n",
+                    self_port
+                );
+                stream
+                    .write_all(op.as_bytes())
+                    .expect("should be able to write to master");
+                let _ = stream.read(&mut read_buf).expect("should get some message");
+                println!("read_buf: {read_buf:?}");
+                let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+                println!("resp: {resp:?}");
+                if !resp.to_lowercase().contains("ok") {
+                    panic!("did not receive ok");
+                }
+                // read_buf.iter_mut().for_each(|x| *x = 0);
+
+                // Do REPLCONF
+                println!("init second replconf");
+                let op = format!("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n");
+                stream
+                    .write_all(op.as_bytes())
+                    .expect("should be able to write to master");
+                let _ = stream.read(&mut read_buf).expect("should get some message");
+                println!("read_buf: {read_buf:?}");
+                let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+                println!("resp: {resp:?}");
+                if !resp.to_lowercase().contains("ok") {
+                    panic!("did not receive ok");
+                }
+                // read_buf.iter_mut().for_each(|x| *x = 0);
+
+                // Do PSYNC
+                println!("init psync");
+                let op = format!("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n");
+                stream
+                    .write_all(op.as_bytes())
+                    .expect("should be able to write to master");
+                let _ = stream.read(&mut read_buf).expect("should get some message");
+                println!("read_buf: {read_buf:?}");
+                // let resp = String::from_utf8(read_buf.to_owned()).unwrap();
+                // println!("resp: {resp:?}");
+                // if !resp.to_lowercase().contains("fullresync") {
+                //     panic!("did not receive fullresync");
+                // }
+            }
         }
-        // read_buf.iter_mut().for_each(|x| *x = 0);
-
-        // Do REPLCONF
-        println!("init first replconf");
-        let op = format!(
-            "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{}\r\n",
-            self_port
-        );
-        stream
-            .write_all(op.as_bytes())
-            .expect("should be able to write to master");
-        let _ = stream.read(&mut read_buf).expect("should get some message");
-        println!("read_buf: {read_buf:?}");
-        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
-        println!("resp: {resp:?}");
-        if !resp.to_lowercase().contains("ok") {
-            panic!("did not receive ok");
-        }
-        // read_buf.iter_mut().for_each(|x| *x = 0);
-
-        // Do REPLCONF
-        println!("init second replconf");
-        let op = format!("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n");
-        stream
-            .write_all(op.as_bytes())
-            .expect("should be able to write to master");
-        let _ = stream.read(&mut read_buf).expect("should get some message");
-        println!("read_buf: {read_buf:?}");
-        let resp = String::from_utf8(read_buf.to_owned()).unwrap();
-        println!("resp: {resp:?}");
-        if !resp.to_lowercase().contains("ok") {
-            panic!("did not receive ok");
-        }
-        // read_buf.iter_mut().for_each(|x| *x = 0);
-
-        // Do PSYNC
-        println!("init psync");
-        let op = format!("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n");
-        stream
-            .write_all(op.as_bytes())
-            .expect("should be able to write to master");
-        let _ = stream.read(&mut read_buf).expect("should get some message");
-        println!("read_buf: {read_buf:?}");
-        // let resp = String::from_utf8(read_buf.to_owned()).unwrap();
-        // println!("resp: {resp:?}");
-        // if !resp.to_lowercase().contains("fullresync") {
-        //     panic!("did not receive fullresync");
-        // }
     }
 
     fn start(self) {
@@ -249,6 +260,9 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
                     handle_set(stream, arr_iter, store)
                 } else if message.contains("get") {
                     handle_get(stream, arr_iter, store)
+                } else if message.contains("replconf") {
+                    // TODO: do this only for Master
+                    handle_replconf(stream, arr_iter)
                 }
             }
         }
@@ -260,7 +274,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
 
     fn handle_echo<'a, T>(stream: &mut TcpStream, mut it: T)
     where
-        T: Iterator<Item = &'a Box<Resp>>,
+        T: Iterator<Item = &'a Resp>,
     {
         let message = it.next().unwrap().get_string().unwrap();
         let len = message.len();
@@ -270,7 +284,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
 
     fn handle_info<'a, T>(stream: &mut TcpStream, mut it: T, role: &Role)
     where
-        T: Iterator<Item = &'a Box<Resp>>,
+        T: Iterator<Item = &'a Resp>,
     {
         let info_type = it.next().unwrap().get_string().unwrap();
         if info_type == "replication" {
@@ -291,7 +305,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
 
     fn handle_set<'a, T>(stream: &mut TcpStream, mut it: T, store: &Store)
     where
-        T: Iterator<Item = &'a Box<Resp>>,
+        T: Iterator<Item = &'a Resp>,
     {
         let key = it.next().unwrap().get_string().unwrap();
         let val = it.next().unwrap().get_string().unwrap();
@@ -316,7 +330,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
 
     fn handle_get<'a, T>(stream: &mut TcpStream, mut it: T, store: &Store)
     where
-        T: Iterator<Item = &'a Box<Resp>>,
+        T: Iterator<Item = &'a Resp>,
     {
         let key = it.next().unwrap().get_string().unwrap();
         let s = store.lock().expect("Store is poisoned!");
@@ -332,6 +346,13 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
             let _ = stream.write_all("$-1\r\n".as_bytes());
         }
     }
+
+    fn handle_replconf<'a, T>(stream: &mut TcpStream, mut it: T)
+    where
+        T: Iterator<Item = &'a Resp>,
+    {
+        let _ = stream.write_all("+OK\r\n".as_bytes());
+    }
 }
 
 /// Implementation of the REDIS protocol
@@ -339,7 +360,7 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
 enum Resp {
     SimpleString(String),
     BulkString(String),
-    Array(Vec<Box<Resp>>),
+    Array(Vec<Resp>),
 }
 
 impl Resp {
@@ -387,7 +408,7 @@ impl Resp {
         (data.to_owned(), residual.to_owned())
     }
 
-    fn parse_array(input: &str) -> (Vec<Box<Resp>>, String) {
+    fn parse_array(input: &str) -> (Vec<Resp>, String) {
         let (data, residual) = input.split_once("\r\n").unwrap();
         let size: usize = data.parse().unwrap();
 
@@ -396,7 +417,7 @@ impl Resp {
 
         for _ in 0..size {
             let (item, res) = Resp::new(&residual);
-            elements.push(Box::new(item));
+            elements.push(item);
             residual = res;
         }
 
@@ -419,8 +440,8 @@ fn resp_test() {
     assert_eq!(
         result,
         Resp::Array(vec![
-            Box::new(Resp::BulkString("hello".to_owned())),
-            Box::new(Resp::BulkString("world".to_owned())),
+            Resp::BulkString("hello".to_owned()),
+            Resp::BulkString("world".to_owned()),
         ])
     );
 }
