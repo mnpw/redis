@@ -12,6 +12,8 @@ use rand::{distributions::Alphanumeric, Rng};
 
 type Store = Arc<Mutex<HashMap<String, (String, Option<Instant>)>>>;
 
+const REPL_ID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+
 fn init_store() -> Store {
     Arc::new(Mutex::new(HashMap::new()))
 }
@@ -90,7 +92,7 @@ impl Server {
                 master_repl_offset,
             } => {
                 return;
-            },
+            }
             Role::Slave((master_host, master_port)) => {
                 let self_port = config.port;
                 let mut read_buf = vec![0; 1024];
@@ -265,6 +267,8 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
                 } else if message.contains("replconf") {
                     // TODO: do this only for Master
                     handle_replconf(stream, arr_iter)
+                } else if message.contains("psync") {
+                    handle_psync(stream, arr_iter)
                 }
             }
         }
@@ -354,6 +358,14 @@ fn handle_connection(mut stream: TcpStream, store: Store, role: Role) {
         T: Iterator<Item = &'a Resp>,
     {
         let _ = stream.write_all("+OK\r\n".as_bytes());
+    }
+
+    fn handle_psync<'a, T>(stream: &mut TcpStream, mut it: T)
+    where
+        T: Iterator<Item = &'a Resp>,
+    {
+        let op = format!("+FULLRESYNC {REPL_ID} 0\r\n");
+        let _ = stream.write_all(op.as_bytes());
     }
 }
 
