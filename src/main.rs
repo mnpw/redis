@@ -88,7 +88,9 @@ impl Server {
             Role::Master {
                 master_replid,
                 master_repl_offset,
-            } => todo!(),
+            } => {
+                return;
+            },
             Role::Slave((master_host, master_port)) => {
                 let self_port = config.port;
                 let mut read_buf = vec![0; 1024];
